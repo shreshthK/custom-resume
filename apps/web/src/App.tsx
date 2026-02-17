@@ -30,6 +30,7 @@ const INITIAL_DRAFT: ResumeDraft = {
 
 export default function App() {
   const [fileKey, setFileKey] = useState("uploads/sample-resume.pdf");
+  const [selectedFileName, setSelectedFileName] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [jobDescriptionText, setJobDescriptionText] = useState("");
   const [customInstructions, setCustomInstructions] = useState(
@@ -43,6 +44,38 @@ export default function App() {
     () => Boolean(fileKey && linkedinUrl && jobDescriptionText && customInstructions),
     [customInstructions, fileKey, jobDescriptionText, linkedinUrl]
   );
+
+  async function handleResumeSelect(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    if (file.type !== "application/pdf") {
+      setStatusMessage("Please select a PDF file only.");
+      return;
+    }
+
+    setSelectedFileName(file.name);
+    setStatusMessage("Preparing upload key...");
+
+    const res = await fetch(`${API_BASE}/files/presign-upload`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fileName: file.name,
+        mimeType: file.type
+      })
+    });
+
+    if (!res.ok) {
+      setStatusMessage("Could not prepare upload key.");
+      return;
+    }
+
+    const data = (await res.json()) as { fileKey: string };
+    setFileKey(data.fileKey);
+    setStatusMessage("PDF selected. Ready to generate.");
+  }
 
   async function handleGenerate(event: FormEvent) {
     event.preventDefault();
@@ -118,9 +151,14 @@ export default function App() {
 
         <form className="form-grid" onSubmit={handleGenerate}>
           <label>
-            Resume File Key
-            <input value={fileKey} onChange={(e) => setFileKey(e.target.value)} />
+            Resume PDF
+            <input
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={(e) => void handleResumeSelect(e.target.files?.[0] ?? null)}
+            />
           </label>
+          {selectedFileName ? <p className="muted">Selected file: {selectedFileName}</p> : null}
           <label>
             LinkedIn Job URL
             <input value={linkedinUrl} onChange={(e) => setLinkedinUrl(e.target.value)} />
