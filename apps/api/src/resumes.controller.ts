@@ -19,7 +19,12 @@ export class ResumesController {
       throw new BadRequestException("fileKey, linkedinUrl, jobDescriptionText, and customInstructions are required.");
     }
 
-    const job = this.resumesService.createJob(body.fileKey);
+    let job;
+    try {
+      job = this.resumesService.createJob(body.fileKey);
+    } catch (error) {
+      throw new BadRequestException((error as Error).message);
+    }
     return {
       jobId: job.jobId,
       status: job.status

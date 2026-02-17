@@ -29,7 +29,7 @@ const INITIAL_DRAFT: ResumeDraft = {
 };
 
 export default function App() {
-  const [fileKey, setFileKey] = useState("uploads/sample-resume.pdf");
+  const [fileKey, setFileKey] = useState("");
   const [selectedFileName, setSelectedFileName] = useState("");
   const [linkedinUrl, setLinkedinUrl] = useState("");
   const [jobDescriptionText, setJobDescriptionText] = useState("");
@@ -72,9 +72,22 @@ export default function App() {
       return;
     }
 
-    const data = (await res.json()) as { fileKey: string };
-    setFileKey(data.fileKey);
-    setStatusMessage("PDF selected. Ready to generate.");
+    const uploadData = (await res.json()) as { fileKey: string; uploadUrl: string };
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const uploadRes = await fetch(uploadData.uploadUrl, {
+      method: "POST",
+      body: formData
+    });
+
+    if (!uploadRes.ok) {
+      setStatusMessage("Failed to upload the PDF.");
+      return;
+    }
+
+    setFileKey(uploadData.fileKey);
+    setStatusMessage("PDF uploaded. Ready to generate.");
   }
 
   async function handleGenerate(event: FormEvent) {

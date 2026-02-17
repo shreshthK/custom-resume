@@ -2,12 +2,18 @@ import { Injectable } from "@nestjs/common";
 import { randomUUID } from "crypto";
 import { ResumeDraft } from "@custom-resume/types";
 import { JobRecord, JobStore } from "./job.store";
+import { LocalFileService } from "./local-file.service";
 
 @Injectable()
 export class ResumesService {
   private readonly store = new JobStore();
+  constructor(private readonly localFileService: LocalFileService) {}
 
   createJob(fileKey: string): JobRecord {
+    if (!this.localFileService.fileExists(fileKey)) {
+      throw new Error("Uploaded resume file not found.");
+    }
+
     const now = new Date();
     const jobId = randomUUID();
 
@@ -25,11 +31,14 @@ export class ResumesService {
 
     this.store.create(record);
 
+    const outputFileKey = `outputs/${jobId}.pdf`;
+    this.localFileService.copyFile(fileKey, outputFileKey);
+
     // Placeholder behavior to keep frontend integration unblocked until SQS worker is wired.
     this.store.update(jobId, {
       status: "COMPLETED",
       finalModelUsed: "deepseek-r1",
-      outputFileKey: `outputs/${jobId}.pdf`,
+      outputFileKey,
       draftResume: this.mockDraft()
     });
 
@@ -41,9 +50,17 @@ export class ResumesService {
   }
 
   regeneratePdf(jobId: string, editedDraftResume: ResumeDraft): JobRecord | undefined {
+    const existing = this.store.get(jobId);
+    if (!existing) {
+      return undefined;
+    }
+
+    const outputFileKey = `outputs/${jobId}-edited.pdf`;
+    this.localFileService.copyFile(existing.resumeFileKey, outputFileKey);
+
     return this.store.update(jobId, {
       status: "COMPLETED",
-      outputFileKey: `outputs/${jobId}-edited.pdf`,
+      outputFileKey,
       draftResume: editedDraftResume,
       finalModelUsed: "deepseek-r1"
     });
